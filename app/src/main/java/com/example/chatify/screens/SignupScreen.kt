@@ -50,7 +50,7 @@ import com.example.chatify.viewModel.MainViewModel
 @Composable
 fun SignupScreen(viewModel: MainViewModel, navController: NavHostController) {
     CheckSignedIn(viewModel = viewModel, navController = navController)
-    SignupScreenContents(viewModel, navController)
+    SignupScreenContents(viewModel = viewModel, navController = navController)
 }
 
 @Composable
@@ -59,6 +59,9 @@ fun SignupScreenContents(viewModel: MainViewModel, navController: NavHostControl
         mutableStateOf("")
     }
     var email by remember {
+        mutableStateOf("")
+    }
+    var number by remember {
         mutableStateOf("")
     }
     var password by remember {
@@ -162,6 +165,35 @@ fun SignupScreenContents(viewModel: MainViewModel, navController: NavHostControl
                 )
 
                 TextField(
+                    value = number,
+                    onValueChange = {
+                        number = it
+                    },
+                    label = {
+                        Text(
+                            text = "Number",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    },
+                    keyboardActions = KeyboardActions(KeyboardActions.Default.onNext),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledTextColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent
+                    ),
+                    shape = MaterialTheme
+                        .shapes
+                        .small
+                        .copy(all = CornerSize(20.dp)),
+                    modifier = Modifier
+                        .padding(12.dp)
+                )
+
+                TextField(
                     value = password,
                     onValueChange = {
                         password = it
@@ -217,7 +249,7 @@ fun SignupScreenContents(viewModel: MainViewModel, navController: NavHostControl
                         )
                         .padding(30.dp)
                         .clickable {
-                            viewModel.createUser(name, email, password, context)
+                            viewModel.createUser(name, email, password, number, context)
                         }
                 )
             }
@@ -232,6 +264,7 @@ fun SignupScreenContents(viewModel: MainViewModel, navController: NavHostControl
                     .fillMaxWidth()
                     .clickable {
                         navController.navigate(DestinationScreen.LoginScreen.route) {
+                            popUpTo(0)
                             launchSingleTop = true
                         }
                     }

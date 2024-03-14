@@ -18,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.chatify.screens.LoginScreen
 import com.example.chatify.screens.MainScreen
+import com.example.chatify.screens.MessagesScreen
+import com.example.chatify.screens.NavigationScreen
 import com.example.chatify.screens.SignupScreen
 import com.example.chatify.ui.theme.ChatifyTheme
 import com.example.chatify.viewModel.MainViewModel
@@ -58,14 +60,19 @@ class MainActivity : ComponentActivity() {
 fun App(viewModel: MainViewModel) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = DestinationScreen.SignupScreen.route) {
-        composable(DestinationScreen.LoginScreen.route) {
-            LoginScreen(viewModel, navController)
-        }
         composable(DestinationScreen.SignupScreen.route) {
             SignupScreen(viewModel,navController)
         }
-        composable(DestinationScreen.MainScreen.route) {
-            MainScreen()
+        composable(DestinationScreen.LoginScreen.route) {
+            LoginScreen(viewModel, navController)
         }
+        composable(DestinationScreen.MainScreen.route) {
+            MainScreen(viewModel, navController)
+        }
+
+        composable("${NavigationScreen.MessagesScreen.route}/{userId}") { backStackEntry ->
+            MessagesScreen(backStackEntry.arguments?.getString("userId") ?: "",navController, viewModel)
+        }
+
     }
 }

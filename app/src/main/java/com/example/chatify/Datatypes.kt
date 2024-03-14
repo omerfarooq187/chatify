@@ -2,9 +2,13 @@ package com.example.chatify
 
 
 data class UserData(
+    var uid:String?="",
     var name:String?="",
-) {
-    val toMap = hashMapOf(
-        "name" to name,
-    )
-}
+    var number:String?="",
+    var imageUrl:String?=""
+)
+
+data class ChatMessage(
+    val sender:String,
+    val message:String
+)

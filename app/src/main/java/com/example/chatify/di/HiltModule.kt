@@ -3,8 +3,12 @@ package com.example.chatify.di
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.database
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.storage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,5 +22,11 @@ object HiltModule {
     fun providesFirebaseAuth(): FirebaseAuth = Firebase.auth
 
     @Provides
-    fun providesFirebaseDatabase(): FirebaseFirestore = Firebase.firestore
+    fun providesFirebaseFirestore(): FirebaseFirestore = Firebase.firestore
+
+    @Provides
+    fun providesFirebaseStorage(): FirebaseStorage = Firebase.storage
+
+    @Provides
+    fun providesFirebaseDatabase(): FirebaseDatabase = Firebase.database
 }
