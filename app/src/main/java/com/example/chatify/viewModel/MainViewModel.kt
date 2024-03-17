@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.chatify.ChatMessage
@@ -11,6 +12,7 @@ import com.example.chatify.MESSAGE
 import com.example.chatify.USER_NODE
 import com.example.chatify.UserData
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -19,6 +21,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObject
 import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.UUID
 import javax.inject.Inject
 
@@ -33,7 +36,7 @@ class MainViewModel @Inject constructor(
     val inProcess = mutableStateOf(false)
     val userData = mutableStateOf<UserData?>(null)
     val currentUserId = mutableStateOf("")
-    val messages = mutableListOf<ChatMessage>()
+    val messages = MutableStateFlow(listOf<ChatMessage>())
 
     private val authStateListener = FirebaseAuth.AuthStateListener {
         val user = it.currentUser
@@ -186,31 +189,39 @@ class MainViewModel @Inject constructor(
             "message" to message
             // Add other message properties as needed
         )
-        messageRef.setValue(messageMap).addOnSuccessListener {
-            messages.add(ChatMessage(sender = currentUserId.value, message))
-        }
+        messageRef.setValue(messageMap)
     }
 
     fun realAllMessages(selectedUserId: String) {
         inProcess.value = true
-        messages.clear()
         val messageRef = if (currentUserId.value < selectedUserId) {
             database.getReference(MESSAGE).child(currentUserId.value).child(selectedUserId)
         } else {
             database.getReference(MESSAGE).child(selectedUserId).child(currentUserId.value)
         }
-        messageRef.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                for (childSnapshot in snapshot.children) {
-                    val sender = childSnapshot.child("senderId").getValue(String::class.java)
-                    val message = childSnapshot.child("message").getValue(String::class.java)
-                    sender?.let {
-                        message?.let {
-                            messages.add(ChatMessage(sender, message))
-                        }
+        messageRef.addChildEventListener(object: ChildEventListener{
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val sender = snapshot.child("senderId").getValue(String::class.java)
+                val message = snapshot.child("message").getValue(String::class.java)
+                sender?.let {
+                    message?.let {
+                        val newMessage = ChatMessage(sender, message)
+                        messages.value += newMessage
                     }
                 }
                 inProcess.value = false
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                // Handle update if needed
+            }
+
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+                // Handle removal if needed
+            }
+
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+                // Handle move if needed
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -219,6 +230,7 @@ class MainViewModel @Inject constructor(
             }
         })
     }
+
 
 
     fun logoutUser() {

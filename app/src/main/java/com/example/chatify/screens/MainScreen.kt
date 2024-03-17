@@ -22,8 +22,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -31,6 +36,7 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Badge
@@ -40,12 +46,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,11 +65,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.modifier.modifierLocalConsumer
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,6 +95,8 @@ import com.example.chatify.DestinationScreen
 import com.example.chatify.viewModel.MainViewModel
 import com.example.chatify.UserData
 import com.example.chatify.ui.theme.appFontFamily
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -373,6 +390,11 @@ fun ChatScreen(
     val (users, setUsers) = remember {
         mutableStateOf<List<UserData>>(emptyList())
     }
+    var isSearching by remember {
+        mutableStateOf(false)
+    }
+
+
     LaunchedEffect(Unit) {
         viewModel.getAllUsers(
             onSuccess = { userList ->
@@ -385,7 +407,6 @@ fun ChatScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -407,10 +428,14 @@ fun ChatScreen(
                     fontSize = 20.sp
                 )
                 Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "New Chat",
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
                     modifier = Modifier
                         .size(30.dp)
+                        .clickable {
+                            isSearching = true
+                            Log.d("Searching", "ChatScreen: $isSearching")
+                        }
                 )
             }
             LazyColumn(
@@ -433,8 +458,73 @@ fun ChatScreen(
         if (viewModel.inProcess.value) {
             CommonProgressBar()
         }
+        if (isSearching) {
+            SearchBar()
+        }
     }
 }
+@Composable
+fun SearchBar(modifier: Modifier = Modifier,
+              hint: String = "",
+              onSearch: (String) -> Unit = {}
+) {
+    var searchInput by remember {
+        mutableStateOf("")
+    }
+
+    var isHintDisplayed by remember {
+        mutableStateOf(hint != "")
+    }
+
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+
+        BasicTextField(
+            value = searchInput,
+            onValueChange = {
+                searchInput = it
+                onSearch(it)
+            },
+            maxLines = 1,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontSize = 16.sp,
+                fontFamily = FontFamily.Cursive,
+                fontWeight = FontWeight.W400),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged {
+                    isHintDisplayed = !it.isFocused
+                }
+        )
+
+        if (isHintDisplayed) {
+            Text(
+                text = hint,
+            )
+        }
+    }
+}
+//@Composable
+//fun SearchUser() {
+//    var userNumber by remember {
+//        mutableStateOf("")
+//    }
+//    val keyboardController = LocalSoftwareKeyboardController.current
+//    TextField(
+//        value = userNumber,
+//        onValueChange = {
+//            userNumber = it
+//        },
+//        keyboardActions = KeyboardActions(
+//            onSearch = {
+//                keyboardController?.hide()
+//            }
+//        )
+//    )
+//}
 
 
 @Composable
@@ -487,101 +577,120 @@ fun MessagesScreen(
     var message by remember {
         mutableStateOf("")
     }
-    val messageKey by remember {
-        mutableIntStateOf(viewModel.messages.hashCode())
+    val scope = rememberCoroutineScope()
+    val lazyListState = rememberLazyListState()
+    val messages = viewModel.messages.collectAsState(initial = emptyList())
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.value = emptyList()
+        viewModel.realAllMessages(selectedUserId)
     }
-        if (viewModel.inProcess.value) {
-            CommonProgressBar()
-        }
-        Box(
+    if (viewModel.inProcess.value) {
+        CommonProgressBar()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            Column(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color("#ADD8E6".toColorInt()))
+                    .statusBarsPadding()
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Back",
+                    style = TextStyle(
+                        fontFamily = appFontFamily
+                    ),
+                    fontSize = 20.sp,
+                    modifier = Modifier
+                        .clickable {
+                            navController.popBackStack()
+                        }
+                )
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "New Chat",
+                    modifier = Modifier
+                        .size(30.dp)
+                )
+            }
+            Box(
+                contentAlignment = Alignment.BottomEnd,
                 modifier = Modifier
                     .fillMaxSize()
+                    .weight(1f)
+                    .padding(8.dp)
             ) {
-                Row(
+                LazyColumn(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color("#ADD8E6".toColorInt()))
-                        .statusBarsPadding()
-                        .padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize(),
+                    state = lazyListState
                 ) {
-                    Text(
-                        text = "Back",
-                        style = TextStyle(
-                            fontFamily = appFontFamily
-                        ),
-                        fontSize = 20.sp,
-                        modifier = Modifier
-                            .clickable {
-                                navController.popBackStack()
-                            }
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "New Chat",
-                        modifier = Modifier
-                            .size(30.dp)
-                    )
-                }
-                Box(
-                    contentAlignment = Alignment.BottomEnd,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                        .padding(8.dp)
-                ) {
-
-                    LazyColumn {
-                        items(viewModel.messages) {
-                            MessageContent(
-                                sender = it.sender,
-                                message = it.message,
-                                currentUserId = viewModel.currentUserId.value,
-                            )
-                        }
+                    scope.launch {
+                        lazyListState.animateScrollToItem(messages.value.size)
+                    }
+                    items(messages.value) { message ->
+                        MessageContent(
+                            sender = message.sender,
+                            message = message.message,
+                            currentUserId = viewModel.currentUserId.value
+                        )
                     }
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .padding(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = {
+                        message = it
+                    },
+                    placeholder = {
+                        Text(text = "Type your message")
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            modifier = Modifier
+                                .clickable {
+                                    viewModel.sendMessage(selectedUserId, message)
+                                    message = ""
+                                }
+                        )
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Send
+                    ),
+                    keyboardActions = KeyboardActions(onSend = {
+                        viewModel.sendMessage(selectedUserId, message)
+                        message = ""
+
+                    }),
                     modifier = Modifier
-                        .padding(8.dp)
-                ) {
-                    TextField(
-                        value = message,
-                        onValueChange = {
-                            message = it
-                        },
-                        placeholder = {
-                            Text(text = "Type your message")
-                        },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
-                                modifier = Modifier
-                                    .clickable {
-                                        viewModel.sendMessage(selectedUserId, message)
-                                        message = ""
-                                    }
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(6.dp)
-                    )
-                }
+                        .fillMaxWidth()
+                        .padding(6.dp)
+                )
             }
         }
-        LaunchedEffect(messageKey) {
-            viewModel.realAllMessages(selectedUserId)
-        }
     }
+}
 
 @Composable
 fun MessageContent(
