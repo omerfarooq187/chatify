@@ -1,9 +1,11 @@
 package com.example.chatify.screens
 
 import android.net.Uri
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +26,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -33,30 +35,35 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -65,14 +72,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.modifier.modifierLocalConsumer
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -80,7 +83,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
-import androidx.lifecycle.ViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -89,14 +91,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.example.chatify.CheckSignedIn
 import com.example.chatify.CommonProgressBar
 import com.example.chatify.DestinationScreen
 import com.example.chatify.viewModel.MainViewModel
-import com.example.chatify.UserData
 import com.example.chatify.ui.theme.appFontFamily
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -155,7 +153,7 @@ fun MainScreenContents(viewModel: MainViewModel, mainNavController: NavHostContr
         Box(
             modifier = Modifier
                 .background(Color.Gray)
-                .padding(it)
+                .padding(it.calculateTopPadding())
         ) {
             NavHost(
                 navController = navController,
@@ -197,7 +195,11 @@ val navigationItems = listOf(
 )
 
 @Composable
-fun ProfileScreen(navController: NavController,mainNavController: NavHostController, viewModel: MainViewModel) {
+fun ProfileScreen(
+    navController: NavController,
+    mainNavController: NavHostController,
+    viewModel: MainViewModel
+) {
     val userData = viewModel.userData.value
     var name by rememberSaveable {
         mutableStateOf(userData?.name ?: "")
@@ -382,151 +384,211 @@ fun ProfileScreen(navController: NavController,mainNavController: NavHostControl
 
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: MainViewModel,
     mainNavController: NavHostController
 ) {
-    val (users, setUsers) = remember {
-        mutableStateOf<List<UserData>>(emptyList())
-    }
-    var isSearching by remember {
+    val users = viewModel.usersList.value
+    var search by remember {
         mutableStateOf(false)
     }
-
-
-    LaunchedEffect(Unit) {
-        viewModel.getAllUsers(
-            onSuccess = { userList ->
-                setUsers(userList)
-            },
-            onError = {
-                Log.d("Users List", "ChatScreen: $it")
+    val isSearching = viewModel.searching.collectAsState()
+    Scaffold(
+        topBar = {
+            Column(verticalArrangement = Arrangement.spacedBy((-1).dp)) {
+                ProjectsTopAppBar(
+                    search = {
+                        search = !search
+                    }
+                )
+                if (search) {
+                    EmbeddedSearchBar(
+                        onQueryChange = viewModel::onSearchTextChange,
+                        isSearchActive = isSearching.value,
+                        onActiveChanged = { viewModel.onToggleSearch() },
+                        onSearch = viewModel::onSearchTextChange,
+                        viewModel = viewModel,
+                        mainNavController = mainNavController
+                    )
+                }
             }
-        )
-    }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
+                .padding(innerPadding)
                 .fillMaxSize()
-                .background(Color.White)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color("#ADD8E6".toColorInt()))
-                    .padding(18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Chats",
-                    style = TextStyle(
-                        fontFamily = appFontFamily
-                    ),
-                    fontSize = 20.sp
-                )
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clickable {
-                            isSearching = true
-                            Log.d("Searching", "ChatScreen: $isSearching")
-                        }
-                )
-            }
             LazyColumn(
                 modifier = Modifier
                     .padding(8.dp)
             ) {
+
                 items(users.filterNot {
                     it.uid == viewModel.currentUserId.value
                 }) { user ->
-                    ChatItem(
-                        imageUrl = user.imageUrl,
-                        name = user.name,
-                        onItemClick = {
-                            mainNavController.navigate("${NavigationScreen.MessagesScreen.route}/${user.uid}")
-                        }
-                    )
+                        ChatItem(
+                            imageUrl = user.imageUrl,
+                            name = user.name,
+                            onItemClick = {
+                                mainNavController.navigate("${NavigationScreen.MessagesScreen.route}/${user.uid}")
+                            }
+                        )
                 }
             }
         }
-        if (viewModel.inProcess.value) {
-            CommonProgressBar()
-        }
-        if (isSearching) {
-            SearchBar()
-        }
+    }
+
+    if (viewModel.inProcess.value) {
+        CommonProgressBar()
     }
 }
+
+
 @Composable
-fun SearchBar(modifier: Modifier = Modifier,
-              hint: String = "",
-              onSearch: (String) -> Unit = {}
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ProjectsTopAppBar(
+    search: () -> Unit,
+    modifier: Modifier = Modifier,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
-    var searchInput by remember {
-        mutableStateOf("")
-    }
-
-    var isHintDisplayed by remember {
-        mutableStateOf(hint != "")
-    }
-
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-
-        BasicTextField(
-            value = searchInput,
-            onValueChange = {
-                searchInput = it
-                onSearch(it)
-            },
-            maxLines = 1,
-            singleLine = true,
-            textStyle = TextStyle(
-                fontSize = 16.sp,
-                fontFamily = FontFamily.Cursive,
-                fontWeight = FontWeight.W400),
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged {
-                    isHintDisplayed = !it.isFocused
-                }
-        )
-
-        if (isHintDisplayed) {
+    TopAppBar(
+        title = {
             Text(
-                text = hint,
+                text = "Chats",
+                style = TextStyle(
+                    fontFamily = appFontFamily
+                ),
+                fontSize = 20.sp
             )
+        },
+        actions = {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = "search",
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .size(30.dp)
+                    .clickable {
+                        search()
+                    }
+            )
+        },
+        modifier = modifier,
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color("#ADD8E6".toColorInt()),
+            actionIconContentColor = Color.Black
+        ),
+        scrollBehavior = scrollBehavior,
+    )
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+fun EmbeddedSearchBar(
+    onQueryChange: (String) -> Unit,
+    isSearchActive: Boolean,
+    onActiveChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    onSearch: ((String) -> Unit)? = null,
+    viewModel: MainViewModel,
+    mainNavController: NavHostController
+) {
+    val users = viewModel.usersList.value
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val activeChanged: (Boolean) -> Unit = { active ->
+        searchQuery = ""
+        onQueryChange("")
+        onActiveChanged(active)
+    }
+    SearchBar(
+        query = searchQuery,
+        onQueryChange = { query ->
+            searchQuery = query
+            onQueryChange(query)
+        },
+        onSearch = onSearch ?: { activeChanged(false) },
+        active = isSearchActive,
+        onActiveChange = activeChanged,
+        modifier = if (isSearchActive) {
+            modifier
+                .animateContentSize(spring(stiffness = Spring.StiffnessHigh))
+        } else {
+            modifier
+                .padding(start = 12.dp, top = 2.dp, end = 12.dp, bottom = 12.dp)
+                .fillMaxWidth()
+                .animateContentSize(spring(stiffness = Spring.StiffnessHigh))
+        },
+        placeholder = { Text("Search") },
+        leadingIcon = {
+            if (isSearchActive) {
+                IconButton(
+                    onClick = { activeChanged(false) },
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        trailingIcon = if (isSearchActive && searchQuery.isNotEmpty()) {
+            {
+                IconButton(
+                    onClick = {
+                        searchQuery = ""
+                        onQueryChange("")
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        colors = SearchBarDefaults.colors(
+            containerColor = if (isSearchActive) {
+                MaterialTheme.colorScheme.background
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
+        tonalElevation = 0.dp,
+        windowInsets = if (isSearchActive) {
+            SearchBarDefaults.windowInsets
+        } else {
+            WindowInsets(0.dp)
+        }
+    ) {
+        LazyColumn {
+            items(users.filter {
+                it.number == searchQuery
+            }) {
+                ChatItem(
+                    imageUrl = it.imageUrl,
+                    name = it.name,
+                    onItemClick = {
+                        mainNavController.navigate("${NavigationScreen.MessagesScreen.route}/${it.uid}")
+                    }
+                )
+            }
         }
     }
 }
-//@Composable
-//fun SearchUser() {
-//    var userNumber by remember {
-//        mutableStateOf("")
-//    }
-//    val keyboardController = LocalSoftwareKeyboardController.current
-//    TextField(
-//        value = userNumber,
-//        onValueChange = {
-//            userNumber = it
-//        },
-//        keyboardActions = KeyboardActions(
-//            onSearch = {
-//                keyboardController?.hide()
-//            }
-//        )
-//    )
-//}
-
-
 @Composable
 fun ChatItem(imageUrl: String?, name: String?, onItemClick: () -> Unit) {
     Row(

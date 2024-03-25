@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.example.chatify.ChatMessage
@@ -16,12 +15,12 @@ import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.toObject
 import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 import javax.inject.Inject
 
@@ -37,6 +36,12 @@ class MainViewModel @Inject constructor(
     val userData = mutableStateOf<UserData?>(null)
     val currentUserId = mutableStateOf("")
     val messages = MutableStateFlow(listOf<ChatMessage>())
+    val usersList = mutableStateOf<List<UserData>>(emptyList())
+    //search bar variables
+    private val _isSearching = MutableStateFlow(false)
+    val searching = _isSearching.asStateFlow()
+    private val numbersList = mutableStateOf<List<String>>(emptyList())
+    private val _searchText = MutableStateFlow("")
 
     private val authStateListener = FirebaseAuth.AuthStateListener {
         val user = it.currentUser
@@ -52,6 +57,14 @@ class MainViewModel @Inject constructor(
 
     init {
         auth.addAuthStateListener(authStateListener)
+        getAllUsers(
+            onSuccess = {
+                usersList.value = it
+            },
+            onError = {
+                Log.d("Users List", "ChatScreen: $it")
+            }
+        )
     }
 
     override fun onCleared() {
@@ -59,13 +72,19 @@ class MainViewModel @Inject constructor(
         auth.removeAuthStateListener(authStateListener)
     }
 
-    fun createUser(name: String, email: String, password: String, number: String,context: Context) {
+    fun createUser(
+        name: String,
+        email: String,
+        password: String,
+        number: String,
+        context: Context
+    ) {
         inProcess.value = true
         auth.createUserWithEmailAndPassword(email, password).addOnCompleteListener {
             if (it.isSuccessful) {
                 inProcess.value = false
                 signIn.value = true
-                createOrUpdateUser(name = name,number = number,imageUrl = null)
+                createOrUpdateUser(name = name, number = number, imageUrl = null)
             } else {
                 inProcess.value = false
                 Toast.makeText(context, "${it.exception}", Toast.LENGTH_SHORT).show()
@@ -76,11 +95,12 @@ class MainViewModel @Inject constructor(
 
     fun uploadData(uri: Uri, name: String, number: String) {
         uploadImage(uri) {
-            createOrUpdateUser(name,number, it.toString())
+            createOrUpdateUser(name, number, it.toString())
         }
     }
-    fun uploadData(name: String,number: String) {
-        createOrUpdateUser(name,number,userData.value?.imageUrl)
+
+    fun uploadData(name: String, number: String) {
+        createOrUpdateUser(name, number, userData.value?.imageUrl)
     }
 
     private fun uploadImage(uri: Uri, onSuccess: (Uri) -> Unit) {
@@ -93,6 +113,7 @@ class MainViewModel @Inject constructor(
             inProcess.value = false
         }
     }
+
     private fun createOrUpdateUser(name: String?, number: String?, imageUrl: String?) {
         inProcess.value = true
         val uid = auth.currentUser?.uid
@@ -152,7 +173,7 @@ class MainViewModel @Inject constructor(
             }
     }
 
-    fun getAllUsers(onSuccess: (List<UserData>) -> Unit, onError: (Exception) -> Unit) {
+    private fun getAllUsers(onSuccess: (List<UserData>) -> Unit, onError: (Exception) -> Unit) {
         inProcess.value = true
         db.collection(USER_NODE)
             .get()
@@ -160,6 +181,10 @@ class MainViewModel @Inject constructor(
                 val userList = result.documents.mapNotNull { document ->
                     document.toObject(UserData::class.java)
                 }
+                val numbers = result.documents.mapNotNull {
+                    it.getString("number")
+                }
+                numbersList.value = numbers
                 onSuccess(userList)
                 inProcess.value = false
             }
@@ -199,7 +224,7 @@ class MainViewModel @Inject constructor(
         } else {
             database.getReference(MESSAGE).child(selectedUserId).child(currentUserId.value)
         }
-        messageRef.addChildEventListener(object: ChildEventListener{
+        messageRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val sender = snapshot.child("senderId").getValue(String::class.java)
                 val message = snapshot.child("message").getValue(String::class.java)
@@ -231,6 +256,16 @@ class MainViewModel @Inject constructor(
         })
     }
 
+    fun onSearchTextChange(text: String) {
+        _searchText.value = text
+    }
+
+    fun onToggleSearch() {
+        _isSearching.value = !_isSearching.value
+        if (!_isSearching.value) {
+            onSearchTextChange("")
+        }
+    }
 
 
     fun logoutUser() {
