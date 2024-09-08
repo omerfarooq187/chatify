@@ -84,7 +84,7 @@ class MainViewModel @Inject constructor(
             if (it.isSuccessful) {
                 inProcess.value = false
                 signIn.value = true
-                createOrUpdateUser(name = name, number = number, imageUrl = null)
+                createOrUpdateUser(name = name, number = number, email, imageUrl = null)
             } else {
                 inProcess.value = false
                 Toast.makeText(context, "${it.exception}", Toast.LENGTH_SHORT).show()
@@ -93,14 +93,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun uploadData(uri: Uri, name: String, number: String) {
+    fun uploadData(uri: Uri, name: String, number: String,email: String) {
         uploadImage(uri) {
-            createOrUpdateUser(name, number, it.toString())
+            createOrUpdateUser(name, number, email, it.toString())
         }
     }
 
-    fun uploadData(name: String, number: String) {
-        createOrUpdateUser(name, number, userData.value?.imageUrl)
+    fun uploadData(name: String, number: String,email: String) {
+        createOrUpdateUser(name, number, email, userData.value?.imageUrl)
     }
 
     private fun uploadImage(uri: Uri, onSuccess: (Uri) -> Unit) {
@@ -114,17 +114,19 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun createOrUpdateUser(name: String?, number: String?, imageUrl: String?) {
+    private fun createOrUpdateUser(name: String?, number: String?, email: String?,imageUrl: String?) {
         inProcess.value = true
         val uid = auth.currentUser?.uid
         userData.value?.name = name
         userData.value?.number = number
+        userData.value?.email = email
         userData.value?.imageUrl = imageUrl
         userData.value?.uid = uid
         val user = hashMapOf(
             "uid" to uid,
             "name" to name,
             "number" to number,
+            "email" to email,
             "imageUrl" to imageUrl
         )
         uid?.let {

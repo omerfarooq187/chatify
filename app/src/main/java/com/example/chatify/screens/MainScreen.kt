@@ -18,9 +18,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,14 +28,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Person
@@ -45,6 +46,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,17 +74,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -93,8 +93,9 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.chatify.CommonProgressBar
 import com.example.chatify.DestinationScreen
-import com.example.chatify.viewModel.MainViewModel
+import com.example.chatify.sendMessageToBackend
 import com.example.chatify.ui.theme.appFontFamily
+import com.example.chatify.viewModel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -116,7 +117,9 @@ fun MainScreenContents(viewModel: MainViewModel, mainNavController: NavHostContr
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = navBackStackEntry?.destination
             BottomAppBar(
-                containerColor = Color("#ADD8E6".toColorInt())
+                containerColor = Color.White,
+                modifier = Modifier
+                    .shadow(4.dp)
             ) {
                 navigationItems.forEach { navigationItem ->
                     NavigationBarItem(
@@ -148,26 +151,25 @@ fun MainScreenContents(viewModel: MainViewModel, mainNavController: NavHostContr
                     )
                 }
             }
-        }
-    ) {
-        Box(
-            modifier = Modifier
-                .background(Color.Gray)
-                .padding(it.calculateTopPadding())
-        ) {
-            NavHost(
-                navController = navController,
-                startDestination = NavigationScreen.ChatScreen.route
+        },
+        content = {
+            Box(
+                modifier = Modifier
             ) {
-                composable(NavigationScreen.ChatScreen.route) {
-                    ChatScreen(viewModel, mainNavController)
-                }
-                composable(NavigationScreen.ProfileScreen.route) {
-                    ProfileScreen(navController, mainNavController, viewModel)
+                NavHost(
+                    navController = navController,
+                    startDestination = NavigationScreen.ChatScreen.route
+                ) {
+                    composable(NavigationScreen.ChatScreen.route) {
+                        ChatScreen(viewModel, mainNavController)
+                    }
+                    composable(NavigationScreen.ProfileScreen.route) {
+                        ProfileScreen(navController, mainNavController, viewModel)
+                    }
                 }
             }
         }
-    }
+    )
 }
 
 data class NavigationItem(
@@ -194,6 +196,7 @@ val navigationItems = listOf(
     )
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavController,
@@ -207,6 +210,9 @@ fun ProfileScreen(
     var number by rememberSaveable {
         mutableStateOf(userData?.number ?: "")
     }
+    var email by rememberSaveable {
+        mutableStateOf(userData?.email ?: "")
+    }
     var selectedUri by rememberSaveable {
         mutableStateOf<Uri?>(null)
     }
@@ -216,7 +222,6 @@ fun ProfileScreen(
         }
 
     if (!viewModel.signIn.value) {
-        // Navigate to the login screen if the user is not signed in
         mainNavController.navigate(DestinationScreen.SignupScreen.route) {
             launchSingleTop = true
             restoreState = true
@@ -224,50 +229,60 @@ fun ProfileScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .wrapContentHeight()
-                    .fillMaxWidth()
-                    .background(Color("#ADD8E6".toColorInt()))
-                    .padding(18.dp)
-            ) {
-                Text(
-                    text = "Back",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clickable {
-                            navController.navigate(NavigationScreen.ChatScreen.route) {
-                                launchSingleTop = true
-                            }
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Profile",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        navController.navigate(NavigationScreen.ChatScreen.route) {
+                            launchSingleTop = true
                         }
-                )
-                Text(
-                    text = "Save",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clickable {
-                            if (selectedUri != null) {
-                                viewModel.uploadData(selectedUri!!, name, number)
-                            } else {
-                                viewModel.uploadData(name, number)
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    Text(
+                        text = "Save",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clickable {
+                                if (selectedUri != null) {
+                                    viewModel.uploadData(uri = selectedUri!!, name = name, email = email, number = number)
+                                } else {
+                                    viewModel.uploadData(name, number, email)
+                                }
                             }
-                        }
-                )
-            }
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White,
+                    actionIconContentColor = Color.Black
+                ),
+                modifier = Modifier.shadow(4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Profile Image Section
             Column(
                 modifier = Modifier
-                    .height(250.dp)
+                    .height(200.dp)
                     .clickable {
                         launcher.launch("image/*")
                     },
@@ -280,8 +295,7 @@ fun ProfileScreen(
                         contentDescription = "Profile photo",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .height(200.dp)
-                            .width(200.dp)
+                            .size(150.dp)
                             .clip(CircleShape)
                     )
                 } else if (userData?.imageUrl != null) {
@@ -290,8 +304,7 @@ fun ProfileScreen(
                         contentDescription = "Profile photo",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .height(200.dp)
-                            .width(200.dp)
+                            .size(150.dp)
                             .clip(CircleShape)
                     )
                 } else {
@@ -299,90 +312,85 @@ fun ProfileScreen(
                         imageVector = Icons.Default.Person,
                         contentDescription = "photo",
                         modifier = Modifier
-                            .height(200.dp)
-                            .width(200.dp)
+                            .size(150.dp)
                             .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.5f))
                     )
                 }
                 Text(
-                    text = "Change profile photo"
+                    text = "Change profile photo",
+                    fontSize = 16.sp,
+                    color = Color.Black,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Editable Fields (Name, Number, Email)
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Name",
-                        fontSize = 18.sp,
-                        modifier = Modifier
-                            .padding(4.dp)
-                    )
-                    BasicTextField(
-                        value = name,
-                        onValueChange = {
-                            name = it
-                        },
-                        textStyle = TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .width(250.dp)
-                    )
-                }
+                ProfileField(label = "Name", value = name, onValueChange = { name = it })
+                Spacer(modifier = Modifier.height(16.dp))
+                ProfileField(label = "Number", value = number, onValueChange = { number = it })
+                Spacer(modifier = Modifier.height(16.dp))
+                ProfileField(label = "Email", value = email, onValueChange = { email = it })
+            }
 
-                Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    Text(
-                        text = "Number",
-                        fontSize = 18.sp,
-                        modifier = Modifier
-                            .padding(4.dp)
-                    )
-                    BasicTextField(
-                        value = number,
-                        onValueChange = {
-                            number = it
-                        },
-                        textStyle = TextStyle(
-                            fontSize = 18.sp
-                        ),
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .width(250.dp)
-                    )
-                }
+            Spacer(modifier = Modifier.height(32.dp))
 
-                Button(
-                    onClick = {
-                        viewModel.logoutUser()
-                    },
-                    modifier = Modifier
-                        .padding(12.dp)
-                ) {
-                    Text(text = "LOG OUT")
-                }
+            Button(
+                onClick = {
+                    viewModel.logoutUser()
+                },
+                modifier = Modifier
+                    .padding(12.dp)
+                    .fillMaxWidth(0.5f)
+                    .align(Alignment.CenterHorizontally),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.LightGray
+                ),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text(
+                    text = "LOG OUT",
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
             }
         }
+
+        // Display a progress bar while data is being uploaded
         if (viewModel.inProcess.value) {
             CommonProgressBar()
         }
     }
-
 }
+
+// Custom composable for text fields with labels
+@Composable
+fun ProfileField(label: String, value: String, onValueChange: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.Gray,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(fontSize = 18.sp),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -395,53 +403,67 @@ fun ChatScreen(
         mutableStateOf(false)
     }
     val isSearching = viewModel.searching.collectAsState()
-    Scaffold(
-        topBar = {
-            Column(verticalArrangement = Arrangement.spacedBy((-1).dp)) {
-                ProjectsTopAppBar(
-                    search = {
-                        search = !search
-                    }
-                )
-                if (search) {
-                    EmbeddedSearchBar(
-                        onQueryChange = viewModel::onSearchTextChange,
-                        isSearchActive = isSearching.value,
-                        onActiveChanged = { viewModel.onToggleSearch() },
-                        onSearch = viewModel::onSearchTextChange,
-                        viewModel = viewModel,
-                        mainNavController = mainNavController
-                    )
-                }
-            }
 
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)  // Light gray background
+    ) {
+        // TopAppBar with Search Button
+        ProjectsTopAppBar(
+            search = {
+                search = !search
+            },
+            modifier = Modifier
+                .shadow(4.dp)
+        )
+
+        // Search Bar - Visible if search is active
+        if (search) {
+            EmbeddedSearchBar(
+                onQueryChange = viewModel::onSearchTextChange,
+                isSearchActive = isSearching.value,
+                onActiveChanged = { viewModel.onToggleSearch() },
+                onSearch = viewModel::onSearchTextChange,
+                viewModel = viewModel,
+                mainNavController = mainNavController
+            )
         }
-    ) { innerPadding ->
+
+        // Chat list
         Box(
             modifier = Modifier
-                .padding(innerPadding)
                 .fillMaxSize()
+                .padding(16.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(8.dp)
-            ) {
-
-                items(users.filterNot {
-                    it.uid == viewModel.currentUserId.value
-                }) { user ->
+            if (users.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
+                    items(users.filterNot { it.uid == viewModel.currentUserId.value }) { user ->
                         ChatItem(
                             imageUrl = user.imageUrl,
-                            name = user.name,
+                            name = user.name!!,
                             onItemClick = {
                                 mainNavController.navigate("${NavigationScreen.MessagesScreen.route}/${user.uid}")
                             }
                         )
+                    }
                 }
+            } else {
+                // Show when no users are found
+                Text(
+                    text = "No chats available",
+                    fontSize = 18.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
     }
 
+    // Show progress indicator if any process is running
     if (viewModel.inProcess.value) {
         CommonProgressBar()
     }
@@ -479,7 +501,7 @@ private fun ProjectsTopAppBar(
         },
         modifier = modifier,
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color("#ADD8E6".toColorInt()),
+            containerColor = Color.White,
             actionIconContentColor = Color.Black
         ),
         scrollBehavior = scrollBehavior,
@@ -518,7 +540,7 @@ fun EmbeddedSearchBar(
                 .animateContentSize(spring(stiffness = Spring.StiffnessHigh))
         } else {
             modifier
-                .padding(start = 12.dp, top = 2.dp, end = 12.dp, bottom = 12.dp)
+//                .padding(start = 12.dp, top = 2.dp, end = 12.dp, bottom = 12.dp)
                 .fillMaxWidth()
                 .animateContentSize(spring(stiffness = Spring.StiffnessHigh))
         },
@@ -576,11 +598,11 @@ fun EmbeddedSearchBar(
     ) {
         LazyColumn {
             items(users.filter {
-                it.number == searchQuery
+                it.email == searchQuery
             }) {
                 ChatItem(
                     imageUrl = it.imageUrl,
-                    name = it.name,
+                    name = it.name!!,
                     onItemClick = {
                         mainNavController.navigate("${NavigationScreen.MessagesScreen.route}/${it.uid}")
                     }
@@ -589,170 +611,188 @@ fun EmbeddedSearchBar(
         }
     }
 }
+
 @Composable
-fun ChatItem(imageUrl: String?, name: String?, onItemClick: () -> Unit) {
+fun ChatItem(
+    imageUrl: String?,
+    name: String,
+    onItemClick: () -> Unit
+) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(6.dp)
             .fillMaxWidth()
-            .clickable {
-                onItemClick()
-            }
+            .padding(vertical = 8.dp)
+            .clickable { onItemClick() },
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Profile image
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
-                contentDescription = "Profile photo",
+                contentDescription = "User Image",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .height(80.dp)
-                    .width(80.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
+                    .background(Color.Gray.copy(alpha = 0.3f))
             )
         } else {
-            Image(
+            // Default icon if no image is available
+            Icon(
                 imageVector = Icons.Default.Person,
-                contentDescription = "",
+                contentDescription = "Default User Icon",
                 modifier = Modifier
-                    .height(80.dp)
-                    .width(80.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
+                    .background(Color.Gray.copy(alpha = 0.3f))
             )
         }
-        Spacer(modifier = Modifier.width(20.dp))
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // User name
         Text(
-            text = name!!,
+            text = name,
             fontSize = 18.sp,
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Medium,
+            color = Color.Black
         )
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessagesScreen(
     selectedUserId: String,
     navController: NavHostController,
     viewModel: MainViewModel
 ) {
-    var message by remember {
-        mutableStateOf("")
-    }
+    var message by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     val messages = viewModel.messages.collectAsState(initial = emptyList())
 
+    // Reset messages on screen load and read all messages for the selected user
     LaunchedEffect(Unit) {
         viewModel.messages.value = emptyList()
         viewModel.realAllMessages(selectedUserId)
     }
+
+    // Show a progress bar if in process
     if (viewModel.inProcess.value) {
         CommonProgressBar()
     }
 
-    Box(
+    // Main Screen Layout
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .padding(8.dp) // Consistent padding for all screen components
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color("#ADD8E6".toColorInt()))
-                    .statusBarsPadding()
-                    .padding(18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+
+        // TopAppBar with a back button
+        TopAppBar(
+            title = {
                 Text(
-                    text = "Back",
+                    text = "Messages",
                     style = TextStyle(
-                        fontFamily = appFontFamily
-                    ),
-                    fontSize = 20.sp,
-                    modifier = Modifier
-                        .clickable {
-                            navController.popBackStack()
-                        }
+                        fontFamily = appFontFamily,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 )
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "New Chat",
-                    modifier = Modifier
-                        .size(30.dp)
-                )
-            }
-            Box(
-                contentAlignment = Alignment.BottomEnd,
+            },
+            navigationIcon = {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                IconButton(onClick = { /* Handle new chat action */ }) {
+                    Icon(Icons.Default.Edit, contentDescription = "New Chat")
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Message list container
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(8.dp)
+        ) {
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f)
-                    .padding(8.dp)
+                    .imePadding(),
+                state = lazyListState
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    state = lazyListState
-                ) {
-                    scope.launch {
-                        lazyListState.animateScrollToItem(messages.value.size)
-                    }
-                    items(messages.value) { message ->
-                        MessageContent(
-                            sender = message.sender,
-                            message = message.message,
-                            currentUserId = viewModel.currentUserId.value
-                        )
-                    }
+                scope.launch {
+                    lazyListState.animateScrollToItem(messages.value.size) // Scroll to last message
+                }
+                items(messages.value) { message ->
+                    MessageContent(
+                        sender = message.sender,
+                        message = message.message,
+                        currentUserId = viewModel.currentUserId.value
+                    )
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .padding(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = message,
-                    onValueChange = {
-                        message = it
-                    },
-                    placeholder = {
-                        Text(text = "Type your message")
-                    },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            modifier = Modifier
-                                .clickable {
+        }
+
+        // Message input field
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 4.dp)
+                .background(Color(0xFFF6F6F6), RoundedCornerShape(20.dp)) // Rounded background
+        ) {
+            OutlinedTextField(
+                value = message,
+                onValueChange = {
+                    message = it
+                },
+                placeholder = {
+                    Text(text = "Type your message...")
+                },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = Color(0xFF6200EE), // Icon color
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                if (message.isNotEmpty()) {
                                     viewModel.sendMessage(selectedUserId, message)
+                                    sendMessageToBackend(selectedUserId,message)
                                     message = ""
                                 }
-                        )
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Send
-                    ),
-                    keyboardActions = KeyboardActions(onSend = {
+                            }
+                    )
+                },
+                shape = RoundedCornerShape(20.dp), // Rounded corners for text field
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Send
+                ),
+                keyboardActions = KeyboardActions(onSend = {
+                    if (message.isNotEmpty()) {
                         viewModel.sendMessage(selectedUserId, message)
                         message = ""
-
-                    }),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(6.dp)
-                )
-            }
+                    }
+                }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+            )
         }
     }
 }
+
 
 @Composable
 fun MessageContent(
