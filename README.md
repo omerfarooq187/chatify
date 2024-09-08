@@ -53,7 +53,7 @@ To set up the Chatify app locally, follow these steps:
 
 Contributions are welcome! If you have suggestions or improvements, please follow these steps:
 
- -Fork the repository.
+ - Fork the repository.
  -Create a new branch for your changes.
  -Commit your changes and push to the branch.
  -Open a pull request to the main repository.
