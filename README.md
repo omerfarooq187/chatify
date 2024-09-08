@@ -16,7 +16,6 @@ Here are some screenshots of the Chatify app:
 <img src="https://github.com/omerfarooq187/chatify/blob/main/app/screens/signup_screen.png" alt="Signup Screen" width="300"/>
 <img src="https://github.com/omerfarooq187/chatify/blob/main/app/screens/login_screen.png" alt="Login Screen" width="300"/>
 <img src="https://github.com/omerfarooq187/chatify/blob/main/app/screens/chats_screen.png" alt="Chats Screen" width="300"/>
-<img src="https://github.com/omerfarooq187/chatify/blob/main/app/screens/profile_screen.png" alt="Profile Screen" width="300"/>
 <img src="https://github.com/omerfarooq187/chatify/blob/main/app/screens/messages_screen.png" alt="Messages Screen" width="300"/>
 
 
